@@ -5,6 +5,7 @@ from typing import List
 
 from .. import schemas, models
 from ..database import get_db
+from ..utils import get_normalized_skill_list
 
 router = APIRouter()
 
@@ -32,6 +33,8 @@ async def update_profile(student_id: int, student: schemas.StudentUpdate, db: As
         raise HTTPException(status_code=404, detail="Student not found")
     
     for key, value in student.dict(exclude_unset=True).items():
+        if key == 'skills':
+            value = get_normalized_skill_list(value)
         setattr(db_student, key, value)
     
     await db.commit()

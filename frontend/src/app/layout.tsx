@@ -1,10 +1,18 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import { Inter, Manrope } from "next/font/google";
 import "./globals.css";
 import Navbar from "@/components/Navbar";
 import { AuthProvider } from "@/context/AuthContext";
 
-const inter = Inter({ subsets: ["latin"] });
+const inter = Inter({ 
+  subsets: ["latin"],
+  variable: '--font-inter',
+});
+
+const manrope = Manrope({
+  subsets: ["latin"],
+  variable: '--font-manrope',
+});
 
 export const metadata: Metadata = {
   title: "DevArena | AI Career Agent for Students",
@@ -18,7 +26,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={`${inter.className} min-h-screen bg-[#0b1326] text-[#dae2fd] antialiased`}>
+      <body className={`${inter.variable} ${manrope.variable} font-sans min-h-screen bg-background text-foreground antialiased`}>
         <AuthProvider>
           <Navbar />
           <main className="pt-20">

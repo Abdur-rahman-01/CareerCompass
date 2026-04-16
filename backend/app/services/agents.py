@@ -311,11 +311,13 @@ Analyze and return as JSON only:
         
         strengths = ["Strong CGPA: " + str(student.cgpa)]
         if matched:
-            strengths.append(f"Relevant skills: {', '.join(list(matched)[:3]))}")
+            matched_str = ", ".join(list(matched)[:3])
+            strengths.append(f"Relevant skills: {matched_str}")
         
         gaps = []
         if missing := opp_skills - student_skills:
-            gaps.append(f"Missing skills: {', '.join(list(missing)[:3]))}")
+            missing_str = ", ".join(list(missing)[:3])
+            gaps.append(f"Missing skills: {missing_str}")
         
         return AuditResult(
             score=min(100, score + 20),

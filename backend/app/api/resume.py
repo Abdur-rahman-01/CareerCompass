@@ -3,95 +3,34 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from typing import List, Dict, Set, Tuple
 import re
-from collections import Counter
 
 from .. import schemas, models
 from ..database import get_db
+from ..services.resume_parser import extract_text_from_file, parse_resume_with_ai
+from ..utils import normalize_skill, SKILL_ALIASES
 
 router = APIRouter()
-
-SKILL_ALIASES: Dict[str, Set[str]] = {
-    'react': {'react', 'react.js', 'reactjs', 'reactjs'},
-    'angular': {'angular', 'angularjs', 'angular.js'},
-    'vue': {'vue', 'vue.js', 'vuejs'},
-    'node': {'node', 'node.js', 'nodejs'},
-    'python': {'python', 'python3', 'py'},
-    'javascript': {'javascript', 'js', 'ecmascript'},
-    'typescript': {'typescript', 'ts'},
-    'java': {'java', 'j2se', 'j2ee'},
-    'csharp': {'c#', 'csharp', 'c sharp'},
-    'cpp': {'c++', 'cpp', 'c plus plus'},
-    'ml': {'machine learning', 'ml', 'machinelearning'},
-    'dl': {'deep learning', 'dl', 'deeplearning', 'neural networks'},
-    'ai': {'artificial intelligence', 'ai', 'ai/ml'},
-    'aws': {'aws', 'amazon web services', 'amazon ws'},
-    'gcp': {'gcp', 'google cloud', 'google cloud platform'},
-    'azure': {'azure', 'microsoft azure'},
-    'sql': {'sql', 'mysql', 'postgresql', 'postgres', 'sqlite', 'mssql'},
-    'nosql': {'nosql', 'mongodb', 'cassandra', 'dynamodb', 'redis'},
-    'docker': {'docker', 'docker-container', 'containerization'},
-    'kubernetes': {'kubernetes', 'k8s', 'kubes'},
-    'git': {'git', 'github', 'gitlab', 'version control'},
-    'web': {'web development', 'web', 'full stack', 'fullstack'},
-    'frontend': {'frontend', 'front-end', 'front end', 'ui'},
-    'backend': {'backend', 'back-end', 'back end', 'server'},
-    'devops': {'devops', 'ci/cd', 'cicd', 'sre'},
-    'data': {'data science', 'data analysis', 'analytics'},
-}
-
-SKILL_CATEGORIES: Dict[str, float] = {
-    'programming': 1.0,
-    'framework': 1.2,
-    'database': 0.9,
-    'cloud': 1.3,
-    'devops': 1.2,
-    'ml_ai': 1.5,
-    'soft_skills': 0.7,
-    'tools': 0.8,
-}
-
-CATEGORY_WEIGHTS = {
-    'programming': 0.8,
-    'framework': 1.0,
-    'database': 0.7,
-    'cloud': 1.1,
-    'devops': 1.0,
-    'ml_ai': 1.4,
-    'soft_skills': 0.5,
-    'tools': 0.6,
-}
-
-def normalize_skill(skill: str) -> str:
-    skill = skill.lower().strip()
-    skill = re.sub(r'[._\-]', ' ', skill)
-    skill = re.sub(r'\s+', ' ', skill)
-    return skill
 
 def get_skill_variants(skill: str) -> Set[str]:
     normalized = normalize_skill(skill)
     variants = {normalized}
     for canonical, aliases in SKILL_ALIASES.items():
-        if normalized in aliases or normalized == canonical:
+        if normalized == canonical:
             variants.update(aliases)
-            variants.add(canonical)
     return variants
 
 def fuzzy_match(skill: str, against: Set[str]) -> Tuple[bool, float]:
     skill_normalized = normalize_skill(skill)
-    variants = get_skill_variants(skill)
     
-    for variant in variants:
-        if variant in against:
-            return True, 1.0
-        if variant[:4] in against or any(variant.startswith(v[:4]) for v in against):
-            return True, 0.8
+    # Direct match on normalized skill or any of its variants
+    if skill_normalized in against:
+        return True, 1.0
     
+    # Prefix matching for variants
     for a in against:
         if len(skill_normalized) >= 4 and len(a) >= 4:
             if skill_normalized[:4] == a[:4]:
-                return True, 0.6
-            if skill_normalized[:3] == a[:3]:
-                return True, 0.5
+                return True, 0.7
     
     return False, 0.0
 
@@ -108,28 +47,6 @@ def dice_coefficient(set1: Set[str], set2: Set[str]) -> float:
     intersection = len(set1 & set2)
     return (2 * intersection) / (len(set1) + len(set2))
 
-def calculate_keyword_match(text1: str, text2: str) -> float:
-    words1 = set(normalize_skill(w) for w in text1.split() if len(w) > 2)
-    words2 = set(normalize_skill(w) for w in text2.split() if len(w) > 2)
-    return jaccard_similarity(words1, words2)
-
-def extract_skills(text: str) -> Set[str]:
-    all_known_skills: Set[str] = set()
-    for aliases in SKILL_ALIASES.values():
-        all_known_skills.update(aliases)
-    
-    text_normalized = normalize_skill(text)
-    found_skills: Set[str] = set()
-    
-    for skill in all_known_skills:
-        if skill in text_normalized:
-            for canonical, aliases in SKILL_ALIASES.items():
-                if skill in aliases:
-                    found_skills.add(canonical)
-                    break
-    
-    return found_skills
-
 def calculate_advanced_match(
     student_skills: List[str],
     student_goals: str,
@@ -140,75 +57,53 @@ def calculate_advanced_match(
     opp_title: str
 ) -> Dict:
     student_skill_set = set(normalize_skill(s) for s in student_skills if s)
-    opp_skill_set = set(normalize_skill(s) for s in opp_required_skills.split(',') if s) if opp_required_skills else set()
+    opp_required_skills_list = [s.strip() for s in opp_required_skills.split(',')] if opp_required_skills else []
+    opp_skill_set = set(normalize_skill(s) for s in opp_required_skills_list if s)
     
-    matched_skills: List[Tuple[str, float]] = []
+    matched_skills: List[str] = []
     missing_skills: List[str] = []
     
     for opp_skill in opp_skill_set:
-        matched = False
         best_score = 0.0
+        opp_variants = get_skill_variants(opp_skill)
         
+        is_matched = False
         for student_skill in student_skill_set:
-            is_match, score = fuzzy_match(student_skill, get_skill_variants(opp_skill))
-            if is_match and score > best_score:
-                best_score = score
-                matched = True
+            match, score = fuzzy_match(student_skill, opp_variants)
+            if match:
+                is_matched = True
+                break
         
-        if matched:
-            matched_skills.append((opp_skill, best_score))
+        if is_matched:
+            matched_skills.append(opp_skill)
         else:
             missing_skills.append(opp_skill)
     
-    skill_match_score = sum(score for _, score in matched_skills)
-    
-    if opp_skill_set:
-        raw_skill_score = (len(matched_skills) / len(opp_skill_set)) * 100
-        weighted_skill_score = (skill_match_score / len(opp_skill_set)) * 100 if matched_skills else 0
-        final_skill_score = (raw_skill_score * 0.4) + (weighted_skill_score * 0.6)
-    else:
-        final_skill_score = 30.0
+    # Calculate Score
+    skill_score = (len(matched_skills) / len(opp_skill_set) * 100) if opp_skill_set else 30.0
     
     jaccard = jaccard_similarity(student_skill_set, opp_skill_set) * 100
     dice = dice_coefficient(student_skill_set, opp_skill_set) * 100
-    
     similarity_score = (jaccard * 0.5) + (dice * 0.5)
-    
-    keyword_score = 0.0
-    if student_goals and opp_title:
-        keyword_score += calculate_keyword_match(student_goals, opp_title) * 25
-    if student_branch and opp_description:
-        keyword_score += calculate_keyword_match(student_branch, opp_description) * 15
-    
-    goal_alignment = 0.0
-    if student_goals:
-        goal_keywords = normalize_skill(student_goals).split()
-        title_desc = f"{opp_title} {opp_description}".lower()
-        goal_matches = sum(1 for kw in goal_keywords if kw in title_desc and len(kw) > 3)
-        goal_alignment = min(20, goal_matches * 5)
     
     cgpa_score = min(15, (student_cgpa / 10.0) * 15)
     
     final_score = (
-        final_skill_score * 0.40 +
+        skill_score * 0.60 +
         similarity_score * 0.20 +
-        keyword_score * 0.15 +
-        goal_alignment * 0.10 +
-        cgpa_score * 0.15
+        cgpa_score * 0.20
     )
     
     final_score = min(100.0, max(0.0, final_score))
     
     return {
-        "skill_score": round(final_skill_score, 1),
+        "final_score": round(final_score, 1),
+        "skill_score": round(skill_score, 1),
         "jaccard": round(jaccard, 1),
         "dice": round(dice, 1),
-        "keyword_match": round(keyword_score, 1),
-        "goal_alignment": round(goal_alignment, 1),
         "cgpa_contribution": round(cgpa_score, 1),
-        "matched_skills": [s for s, _ in matched_skills],
+        "matched_skills": matched_skills,
         "missing_skills": missing_skills,
-        "final_score": round(final_score, 1)
     }
 
 @router.post("/parse")
@@ -217,59 +112,72 @@ async def parse_resume(
     student_id: int = Form(...),
     db: AsyncSession = Depends(get_db)
 ):
+    # 1. Verify Student
     student_result = await db.execute(select(models.Student).where(models.Student.id == student_id))
     student = student_result.scalars().first()
     if not student:
         raise HTTPException(status_code=404, detail="Student not found")
     
-    filename = file.filename or ""
-    if not (filename.endswith('.pdf') or filename.endswith('.docx')):
-        raise HTTPException(status_code=400, detail="Unsupported file format")
+    # 2. Extract Text
+    content = await file.read()
+    raw_text = extract_text_from_file(content, file.filename)
+    if not raw_text:
+        raise HTTPException(status_code=400, detail="Failed to extract text from file")
     
-    extracted_skills: List[str] = []
-    extracted_name = student.full_name or ""
-    extracted_email = student.email or ""
+    # 3. Parse with AI
+    try:
+        parsed_data = await parse_resume_with_ai(raw_text)
+        if not parsed_data:
+            raise HTTPException(status_code=503, detail="The AI brain is currently busy processing other clusters. Please try again in a few moments.")
+        
+        if "error" in parsed_data:
+            # Handle specific known errors (like Quota Exceeded)
+            if parsed_data["error"] == "QUOTA_EXCEEDED":
+                raise HTTPException(status_code=429, detail=parsed_data.get("message", "AI Quota Exceeded"))
+            raise HTTPException(status_code=503, detail=parsed_data.get("message", "AI Service Error"))
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Critical Parsing Failure: {e}")
+        raise HTTPException(status_code=500, detail="A neural sync error occurred. Our agents are investigating.")
+
+    # 4. Sync with Database (Consistancy Layer)
+    if not student.full_name or student.full_name == "New Student":
+        student.full_name = parsed_data.get("full_name", student.full_name)
     
-    if student.skills and isinstance(student.skills, str):
-        skill_list = [s.strip() for s in student.skills.split(',')]
-        extracted_skills.extend([s for s in skill_list if s])
+    if parsed_data.get("branch") and (not student.branch or student.branch == "Not Specified"):
+        student.branch = parsed_data.get("branch")
+        
+    if parsed_data.get("cgpa") and (not student.cgpa or student.cgpa == 0.0):
+        try:
+            student.cgpa = float(parsed_data.get("cgpa"))
+        except: pass
+        
+    if parsed_data.get("year") and (not student.year or student.year == 1):
+        try:
+            student.year = int(parsed_data.get("year"))
+        except: pass
+
+    # Skills Merging & Normalization
+    existing_skills = set(normalize_skill(s) for s in (student.skills or "").split(',') if s.strip())
+    new_skills = set(normalize_skill(s) for s in parsed_data.get("skills", []) if s.strip())
+    merged_skills = sorted(list(existing_skills | new_skills))
+    student.skills = ", ".join(merged_skills)
     
-    common_skills = [
-        'python', 'javascript', 'typescript', 'java', 'c++', 'c#', 'golang', 'rust',
-        'react', 'next.js', 'vue', 'angular', 'node.js', 'express', 'django', 'flask',
-        'sql', 'mysql', 'postgresql', 'mongodb', 'redis', 'graphql', 'rest', 'api',
-        'aws', 'gcp', 'azure', 'docker', 'kubernetes', 'jenkins', 'git', 'github',
-        'machine learning', 'deep learning', 'data science', 'nlp', 'computer vision',
-        'html', 'css', 'sass', 'tailwind', 'bootstrap', 'figma', 'ui/ux',
-        'linux', 'bash', 'shell', 'ci/cd', 'devops', 'agile', 'scrum',
-        'tensorflow', 'pytorch', 'pandas', 'numpy', 'scikit-learn', 'keras',
-    ]
-    
-    profile_parts = [
-        student.full_name or '',
-        student.email or '',
-        student.skills or '',
-        student.goals or '',
-        student.branch or ''
-    ]
-    profile_text = ' '.join(profile_parts)
-    
-    for skill in common_skills:
-        normalized = normalize_skill(skill)
-        if normalized in profile_text.lower() and skill not in [normalize_skill(s) for s in extracted_skills]:
-            for canonical, aliases in SKILL_ALIASES.items():
-                if normalized in aliases:
-                    if canonical not in [normalize_skill(s) for s in extracted_skills]:
-                        extracted_skills.append(canonical)
-                    break
-    
+    # Commit changes
+    await db.commit()
+    await db.refresh(student)
+
+    # 5. Calculate Matches with updated profile
     opps_result = await db.execute(select(models.Opportunity))
     opportunities = opps_result.scalars().all()
     
     matches: List[dict] = []
+    student_skill_list = [s.strip() for s in (student.skills or "").split(',') if s.strip()]
+    
     for opp in opportunities:
         match_result = calculate_advanced_match(
-            student_skills=extracted_skills,
+            student_skills=student_skill_list,
             student_goals=student.goals or "",
             student_branch=student.branch or "",
             student_cgpa=student.cgpa or 0.0,
@@ -289,14 +197,6 @@ async def parse_resume(
                 "url": opp.url or "",
             },
             "matchScore": match_result["final_score"],
-            "breakdown": {
-                "skill_match": match_result["skill_score"],
-                "jaccard_similarity": match_result["jaccard"],
-                "dice_coefficient": match_result["dice"],
-                "keyword_match": match_result["keyword_match"],
-                "goal_alignment": match_result["goal_alignment"],
-                "cgpa_contribution": match_result["cgpa_contribution"],
-            },
             "matchedSkills": match_result["matched_skills"],
             "missingSkills": match_result["missing_skills"],
         })
@@ -305,15 +205,10 @@ async def parse_resume(
     
     return {
         "parsed": True,
-        "name": extracted_name,
-        "email": extracted_email,
-        "skills": extracted_skills[:20],
-        "experience": [f"Student at {student.branch}"],
-        "education": [f"Year {student.year}, CGPA: {student.cgpa}"],
+        "name": student.full_name,
+        "email": student.email,
+        "skills": student_skill_list[:25],
+        "experience": parsed_data.get("experience", []),
+        "education": parsed_data.get("education", []),
         "matches": matches[:10]
     }
-
-@router.get("/skill-extract")
-async def extract_skills_from_text(text: str):
-    skills = extract_skills(text)
-    return {"skills": list(skills)}

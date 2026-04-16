@@ -8,3 +8,6 @@ aiosqlite
 firecrawl
 crewai
 litellm
+pdfminer.six
+python-docx
+google-generativeai

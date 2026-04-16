@@ -2,9 +2,14 @@
 
 import { useEffect, useState } from 'react';
 import axios from 'axios';
-import { Zap, Briefcase, Award, GraduationCap, MapPin, ExternalLink, ChevronRight, Search, TrendingUp, Clock, Target, Sparkles, Loader2, AlertCircle, Plus } from 'lucide-react';
+import { 
+  Zap, Briefcase, Award, GraduationCap, MapPin, 
+  ExternalLink, ChevronRight, Search, TrendingUp, 
+  Clock, Target, Sparkles, Loader2, AlertCircle, Plus 
+} from 'lucide-react';
 import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
+import { motion, AnimatePresence } from 'framer-motion';
 
 interface Opportunity {
   id: number;
@@ -77,242 +82,290 @@ export default function Dashboard() {
     return 'Good evening';
   };
 
-  const getMatchScoreColor = (score: number) => {
-    if (score >= 80) return 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20';
-    if (score >= 60) return 'text-amber-400 bg-amber-500/10 border-amber-500/20';
-    return 'text-rose-400 bg-rose-500/10 border-rose-500/20';
-  };
-
   const stats = [
-    { icon: Zap, label: 'New Matches', value: matches.length, color: 'indigo' },
-    { icon: Briefcase, label: 'Applications', value: '5', color: 'emerald' },
-    { icon: Award, label: 'Profile Strength', value: '85%', color: 'purple' },
-    { icon: GraduationCap, label: 'Avg Match', value: '4.0', color: 'amber' },
+    { icon: Zap, label: 'Velocity', value: `${matches.length * 12}%`, color: 'emerald' },
+    { icon: Target, label: 'Readiness', value: '85%', color: 'gold' },
+    { icon: Briefcase, label: 'Opportunities', value: matches.length, color: 'emerald' },
+    { icon: Award, label: 'Rank', value: '#12', color: 'gold' },
   ];
 
   return (
-    <div className="max-w-7xl mx-auto px-6 py-12">
-      <header className="mb-10 flex flex-col md:flex-row md:items-end justify-between gap-4">
-        <div>
-          <p className="text-sm text-slate-500 font-medium mb-1">{getGreeting()}</p>
-          <h1 className="text-3xl font-bold mb-2">
-            Welcome back, <span className="gradient-text">{studentName}</span>
-          </h1>
-          <p className="text-slate-400">Here are the best opportunities matched specifically for your profile today.</p>
-        </div>
-        <div className="flex items-center gap-3">
-          <Link href="/resume" className="btn-secondary text-sm py-2.5">
-            <Plus size={18} />
-            Add Resume
-          </Link>
-          <button 
-            onClick={handleLiveSearch}
-            disabled={searching}
-            className="btn-primary text-sm py-2.5"
-          >
-            {searching ? <Loader2 size={18} className="animate-spin" /> : <Sparkles size={18} />}
-            {searching ? 'Scanning...' : 'Live Search'}
-          </button>
-        </div>
-      </header>
-
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-10 stagger-children">
-        {stats.map((stat, index) => {
-          const Icon = stat.icon;
-          return (
-            <div key={index} className="glass-card-static flex items-center gap-4">
-              <div className={`w-12 h-12 rounded-xl bg-${stat.color}-500/10 flex items-center justify-center border border-${stat.color}-500/20`}>
-                <Icon className={`text-${stat.color}-400`} size={22} />
-              </div>
-              <div>
-                <div className="text-2xl font-bold">{stat.value}</div>
-                <div className="text-xs text-slate-500 uppercase tracking-wider font-semibold">{stat.label}</div>
-              </div>
+    <div className="min-h-screen hero-mesh pb-20">
+      <div className="max-w-7xl mx-auto px-6 pt-24">
+        {/* Header Section */}
+        <header className="mb-16 flex flex-col md:flex-row md:items-end justify-between gap-8 animate-fade-in">
+          <div>
+            <div className="flex items-center gap-2 mb-3">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              <p className="text-xs text-emerald-500 font-bold uppercase tracking-[0.2em]">{getGreeting()}</p>
             </div>
-          );
-        })}
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div className="lg:col-span-2 space-y-6">
-          <div className="flex items-center justify-between">
-            <h2 className="text-xl font-bold flex items-center gap-3">
-              Tailored Opportunities 
-              <span className="px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-400 text-[10px] uppercase font-bold tracking-widest flex items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                Live
-              </span>
-            </h2>
-            <div className="flex items-center gap-2 text-sm text-slate-500">
-              <Search size={16} />
-              <span>{matches.length} results</span>
-            </div>
+            <h1 className="text-5xl md:text-6xl font-display font-semibold mb-4 leading-tight">
+              Command <span className="gradient-text">Center</span>
+            </h1>
+            <p className="text-lg text-slate-400 max-w-2xl font-light">
+              Welcome back, {studentName}. Your AI agent has analyzed 154 new clusters to find these high-resonance matches.
+            </p>
           </div>
           
-          {loading ? (
-            <div className="glass-card-static h-64 flex flex-col items-center justify-center">
-              <Loader2 size={32} className="animate-spin text-indigo-500 mb-4" />
-              <p className="text-slate-500">Agent is scanning for opportunities...</p>
-            </div>
-          ) : error ? (
-            <div className="glass-card-static border-rose-500/20 flex flex-col items-center justify-center py-12">
-              <AlertCircle size={32} className="text-rose-400 mb-4" />
-              <p className="text-slate-400 mb-4">{error}</p>
-              <button onClick={fetchMatches} className="btn-secondary text-sm">
-                Try Again
-              </button>
-            </div>
-          ) : matches.length === 0 ? (
-            <div className="glass-card-static border-dashed border-white/20 flex flex-col items-center justify-center py-16">
-              <div className="w-16 h-16 rounded-2xl bg-indigo-500/10 flex items-center justify-center mb-6 border border-indigo-500/20">
-                <Target size={32} className="text-indigo-400" />
-              </div>
-              <h3 className="text-xl font-bold mb-2 text-white">No opportunities found</h3>
-              <p className="text-slate-500 mb-6 text-center max-w-md">
-                Start by adding your resume or running a live search to discover opportunities that match your profile.
-              </p>
-              <button onClick={handleLiveSearch} className="btn-primary">
-                <Sparkles size={18} />
-                Start Live Search
-              </button>
-            </div>
-          ) : (
-            matches.map((match, index) => (
-              <div 
-                key={match.id} 
-                className="glass-card group cursor-pointer"
-                style={{ animationDelay: `${index * 100}ms` }}
-              >
-                <div className="flex flex-col md:flex-row md:items-start gap-6">
-                  <div className="flex-1">
-                    <div className="flex items-start justify-between mb-4">
-                      <div className="flex gap-4">
-                        <div className="w-12 h-12 rounded-xl bg-slate-800 flex items-center justify-center border border-white/10 group-hover:border-indigo-500/30 transition-colors">
-                          <Briefcase className="text-slate-400 group-hover:text-indigo-400 transition-colors" size={22} />
-                        </div>
-                        <div>
-                          <h3 className="text-lg font-bold text-white mb-1 group-hover:text-indigo-300 transition-colors">{match.opportunity.title}</h3>
-                          <div className="flex items-center gap-3 text-sm text-slate-500">
-                            <span className="flex items-center gap-1 font-medium">
-                              <MapPin size={14} /> {match.opportunity.company}
-                            </span>
-                            <span className="capitalize badge badge-indigo">{match.opportunity.type}</span>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
+          <div className="flex items-center gap-4">
+            <Link href="/resume" className="btn-secondary group">
+              <Plus size={18} className="group-hover:rotate-90 transition-transform" />
+              Initialize Resume
+            </Link>
+            <button 
+              onClick={handleLiveSearch}
+              disabled={searching}
+              className="btn-primary glow-emerald"
+            >
+              {searching ? (
+                <Loader2 size={18} className="animate-spin" />
+              ) : (
+                <Sparkles size={18} className="animate-pulse-emerald" />
+              )}
+              {searching ? 'Syncing...' : 'Live Pulse Scan'}
+            </button>
+          </div>
+        </header>
 
-                    <p className="text-slate-400 text-sm mb-5 line-clamp-2">
-                      {match.opportunity.description}
-                    </p>
-
-                    <div className="flex flex-wrap gap-2 mb-5">
-                      {match.opportunity.required_skills.split(',').slice(0, 6).map(skill => (
-                        <span 
-                          key={skill} 
-                          className="px-3 py-1 rounded-full bg-white/5 border border-white/5 text-slate-400 text-xs font-medium group-hover:border-white/10 transition-colors"
-                        >
-                          {skill.trim()}
-                        </span>
-                      ))}
-                      {match.opportunity.required_skills.split(',').length > 6 && (
-                        <span className="px-3 py-1 rounded-full bg-white/5 text-slate-500 text-xs">
-                          +{match.opportunity.required_skills.split(',').length - 6} more
-                        </span>
-                      )}
+        {/* Career Velocity Section (Stats) */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 mb-16 stagger-children">
+          {stats.map((stat, index) => {
+            const Icon = stat.icon;
+            const isEmerald = stat.color === 'emerald';
+            return (
+              <div key={index} className="glass-card-static relative group overflow-hidden">
+                <div className={`absolute -right-4 -top-4 opacity-[0.03] group-hover:opacity-[0.07] transition-opacity duration-700`}>
+                  <Icon size={120} />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className={`p-2.5 rounded-xl ${isEmerald ? 'bg-emerald-500/10 text-emerald-500' : 'bg-gold-500/10 text-amber-500'}`}>
+                      <Icon size={20} />
                     </div>
-
-                    <div className="flex items-center gap-3">
-                      <Link 
-                        href={`/audit?opp=${match.opportunity.id}`} 
-                        className="btn-primary text-sm py-2"
-                      >
-                        Audit Resume 
-                        <ChevronRight size={16} />
-                      </Link>
-                      <a 
-                        href={match.opportunity.url} 
-                        target="_blank" 
-                        rel="noopener noreferrer"
-                        className="flex items-center gap-2 text-sm text-slate-400 hover:text-white transition-colors font-medium ml-auto"
-                      >
-                        View Original 
-                        <ExternalLink size={16} />
-                      </a>
-                    </div>
+                    <span className={`text-[10px] font-bold uppercase tracking-widest ${isEmerald ? 'text-emerald-500/50' : 'text-amber-500/50'}`}>
+                      Metric {index + 1}
+                    </span>
                   </div>
-
-                  <div className={`flex flex-col items-center justify-center p-4 rounded-xl border ${getMatchScoreColor(match.match_score)} min-w-[90px]`}>
-                    <span className="text-3xl font-bold">{Math.round(match.match_score)}%</span>
-                    <span className="text-[10px] uppercase font-bold text-slate-500 mt-1">Match</span>
-                  </div>
+                  <div className="text-3xl font-display font-semibold text-white">{stat.value}</div>
+                  <div className="text-xs text-slate-500 uppercase tracking-wider font-bold">{stat.label}</div>
                 </div>
               </div>
-            ))
-          )}
+            );
+          })}
         </div>
 
-        <div className="space-y-6">
-          <div className="glass-card-static">
-            <h3 className="text-sm font-bold uppercase tracking-widest text-slate-500 mb-6 flex items-center gap-2">
-              <Clock size={16} /> Upcoming Deadlines
-            </h3>
-            <div className="space-y-5">
-              <div className="flex gap-4">
-                <div className="w-2 h-12 rounded-full bg-amber-500/50" />
-                <div>
-                  <div className="text-sm font-bold text-white">Google Internships</div>
-                  <div className="text-xs text-slate-500">Applications Close in 2 days</div>
-                </div>
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
+          {/* Main Content - Opportunities */}
+          <div className="lg:col-span-8 space-y-10">
+            <div className="flex items-center justify-between border-b border-white/5 pb-6">
+              <h2 className="text-2xl font-display font-semibold flex items-center gap-4">
+                Opportunity Horizon
+                <span className="badge badge-emerald text-[10px]">Active Wave</span>
+              </h2>
+              <div className="flex items-center gap-3 text-sm text-slate-500 bg-white/5 px-4 py-1.5 rounded-full border border-white/5">
+                <Search size={14} />
+                <span className="font-medium">{matches.length} Matches Found</span>
               </div>
-              <div className="flex gap-4">
-                <div className="w-2 h-12 rounded-full bg-emerald-500/50" />
-                <div>
-                  <div className="text-sm font-bold text-white">Stripe Hackathon</div>
-                  <div className="text-xs text-slate-500">Register by April 20th</div>
+            </div>
+            
+            <div className="space-y-6">
+              {loading ? (
+                <div className="glass-card-static h-96 flex flex-col items-center justify-center border-dashed border-white/10">
+                  <Loader2 size={40} className="animate-spin text-emerald-500 mb-6" />
+                  <p className="text-slate-400 font-medium tracking-wide">Syncing with global clusters...</p>
                 </div>
-              </div>
-              <div className="flex gap-4">
-                <div className="w-2 h-12 rounded-full bg-purple-500/50" />
-                <div>
-                  <div className="text-sm font-bold text-white">Microsoft Explore</div>
-                  <div className="text-xs text-slate-500">Deadline in 5 days</div>
+              ) : error ? (
+                <div className="glass-card-static border-rose-500/10 flex flex-col items-center justify-center py-20 grayscale hover:grayscale-0 transition-all">
+                  <AlertCircle size={40} className="text-rose-500/40 mb-6" />
+                  <p className="text-slate-400 mb-6 font-medium">{error}</p>
+                  <button onClick={fetchMatches} className="btn-secondary">Re-Initialize</button>
                 </div>
-              </div>
+              ) : matches.length === 0 ? (
+                <div className="glass-card-static border-dashed border-white/5 flex flex-col items-center justify-center py-24 bg-emerald-500/[0.01]">
+                  <div className="w-20 h-20 rounded-3xl bg-emerald-500/5 flex items-center justify-center mb-8 border border-emerald-500/10 glow-emerald">
+                    <Target size={40} className="text-emerald-500/40" />
+                  </div>
+                  <h3 className="text-2xl font-display font-semibold mb-3 text-white">Zone Empty</h3>
+                  <p className="text-slate-500 mb-10 text-center max-w-sm leading-relaxed">
+                    No active resonances detected. Upload your DNA profile (Resume) or broaden your scan area.
+                  </p>
+                  <button onClick={handleLiveSearch} className="btn-primary">
+                    <Sparkles size={18} />
+                    Begin Resonance Scan
+                  </button>
+                </div>
+              ) : (
+                <AnimatePresence>
+                  {matches.map((match, index) => (
+                    <motion.div 
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: index * 0.1 }}
+                      key={match.id} 
+                      className="glass-card group overflow-hidden"
+                    >
+                      <div className="flex flex-col md:flex-row md:items-stretch gap-8">
+                        <div className="flex-1 py-1">
+                          <header className="flex items-start justify-between mb-6">
+                            <div className="flex gap-5">
+                              <div className="w-14 h-14 rounded-2xl bg-surface-lowest flex items-center justify-center border border-white/5 group-hover:border-emerald-500/20 transition-all duration-500 shadow-inner">
+                                <Briefcase className="text-slate-500 group-hover:text-emerald-400 transition-colors" size={24} />
+                              </div>
+                              <div>
+                                <h3 className="text-xl font-display font-semibold text-white mb-2 group-hover:gradient-text transition-all duration-500">
+                                  {match.opportunity.title}
+                                </h3>
+                                <div className="flex items-center gap-4 text-sm text-slate-500">
+                                  <span className="flex items-center gap-1.5 font-medium text-slate-400">
+                                    <MapPin size={14} className="text-emerald-500/50" /> {match.opportunity.company}
+                                  </span>
+                                  <span className="badge badge-emerald py-0.5 px-3">{match.opportunity.type}</span>
+                                </div>
+                              </div>
+                            </div>
+                          </header>
+
+                          <p className="text-slate-400 text-sm mb-6 leading-relaxed line-clamp-2 max-w-2xl font-light">
+                            {match.opportunity.description}
+                          </p>
+
+                          <div className="flex flex-wrap gap-2 mb-8">
+                            {match.opportunity.required_skills.split(',').slice(0, 5).map(skill => (
+                              <span 
+                                key={skill} 
+                                className="px-3.5 py-1.5 rounded-xl bg-surface-lowest border border-white/[0.03] text-slate-400 text-[11px] font-bold uppercase tracking-wider group-hover:border-emerald-500/10 transition-colors"
+                              >
+                                {skill.trim()}
+                              </span>
+                            ))}
+                            {match.opportunity.required_skills.split(',').length > 5 && (
+                              <span className="px-3.5 py-1.5 rounded-xl bg-white/[0.02] text-slate-600 text-[11px] font-bold">
+                                +{match.opportunity.required_skills.split(',').length - 5} MORE
+                              </span>
+                            )}
+                          </div>
+
+                          <div className="flex items-center gap-4 pt-4 border-t border-white/[0.03]">
+                            <Link 
+                              href={`/audit?opp=${match.opportunity.id}`} 
+                              className="btn-primary py-2.5 px-6 text-sm"
+                            >
+                              Initialize Audit 
+                              <ChevronRight size={16} />
+                            </Link>
+                            <a 
+                              href={match.opportunity.url} 
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                              className="flex items-center gap-2 text-xs text-slate-500 hover:text-emerald-400 transition-all font-bold uppercase tracking-widest ml-auto"
+                            >
+                              Details
+                              <ExternalLink size={14} />
+                            </a>
+                          </div>
+                        </div>
+
+                        <div className="flex flex-col items-center justify-center p-6 md:p-8 rounded-2xl bg-surface-lowest border border-white/[0.03] group-hover:border-emerald-500/10 transition-all duration-500 min-w-[130px]">
+                          <div className="relative">
+                            <svg className="w-16 h-16 transform -rotate-90">
+                              <circle
+                                cx="32"
+                                cy="32"
+                                r="28"
+                                stroke="currentColor"
+                                strokeWidth="4"
+                                fill="transparent"
+                                className="text-white/5"
+                              />
+                              <circle
+                                cx="32"
+                                cy="32"
+                                r="28"
+                                stroke="currentColor"
+                                strokeWidth="4"
+                                fill="transparent"
+                                strokeDasharray={176}
+                                strokeDashoffset={176 - (176 * match.match_score) / 100}
+                                className="text-emerald-500"
+                              />
+                            </svg>
+                            <div className="absolute inset-0 flex items-center justify-center text-xl font-display font-bold text-white">
+                              {Math.round(match.match_score)}
+                            </div>
+                          </div>
+                          <span className="text-[10px] uppercase font-bold tracking-[0.2em] text-emerald-500/50 mt-4">Resonance</span>
+                        </div>
+                      </div>
+                    </motion.div>
+                  ))}
+                </AnimatePresence>
+              )}
             </div>
           </div>
 
-          <div className="glass-card-static relative overflow-hidden">
-            <div className="absolute top-0 right-0 p-8 opacity-10 pointer-events-none">
-              <Sparkles size={80} className="fill-current text-indigo-500" />
-            </div>
-            <h3 className="text-sm font-bold uppercase tracking-widest text-slate-500 mb-4 flex items-center gap-2">
-              <Sparkles size={16} /> AI Insight
-            </h3>
-            <div className="relative z-10">
-              <p className="text-sm text-slate-300 font-medium leading-relaxed mb-4">
-                "{studentName}, your research interests align perfectly with the AI position at Future Labs. Consider updating your profile with the latest PyTorch project for a 98% match."
-              </p>
-              <div className="flex items-center gap-2 text-xs text-emerald-400 font-medium">
-                <TrendingUp size={14} />
-                <span>+13% match potential</span>
+          {/* Sidebar Area */}
+          <div className="lg:col-span-4 space-y-8">
+            {/* AI Insight Section */}
+            <div className="glass-card-static relative overflow-hidden bg-gradient-to-br from-emerald-500/[0.03] to-surface-lowest glow-emerald p-8">
+              <div className="absolute top-0 right-0 p-6 opacity-[0.05] text-emerald-500">
+                <Sparkles size={64} className="animate-pulse" />
+              </div>
+              <h3 className="text-[10px] font-bold uppercase tracking-[0.3em] text-emerald-500/60 mb-8 flex items-center gap-3">
+                <Sparkles size={14} /> AI Resonance Pulse
+              </h3>
+              <div className="relative z-10">
+                <p className="text-base text-slate-200 font-light leading-relaxed mb-8 italic">
+                  "{studentName}, your architectural pattern matches the 'Future Labs' stack with 94% precision. Focus on the 'Grit-Text' gradients in your project for maximal impact."
+                </p>
+                <div className="flex items-center gap-3 py-3 px-4 rounded-xl bg-emerald-500/5 border border-emerald-500/10">
+                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
+                  <span className="text-xs text-emerald-400 font-bold uppercase tracking-wider">Advantage Detected</span>
+                  <span className="text-xs text-emerald-600 font-bold ml-auto">+13%</span>
+                </div>
               </div>
             </div>
-          </div>
 
-          <div className="glass-card-static bg-gradient-to-br from-indigo-500/5 to-purple-500/5 border-indigo-500/20">
-            <h3 className="text-sm font-bold uppercase tracking-widest text-indigo-400 mb-4 flex items-center gap-2">
-              <Target size={16} /> Quick Actions
-            </h3>
-            <div className="space-y-3">
-              <Link href="/resume" className="flex items-center justify-between p-3 rounded-lg bg-white/5 hover:bg-white/10 transition-colors group">
-                <span className="text-sm text-slate-300">Upload Resume</span>
-                <Plus size={16} className="text-slate-500 group-hover:text-indigo-400 transition-colors" />
-              </Link>
-              <Link href="/profile" className="flex items-center justify-between p-3 rounded-lg bg-white/5 hover:bg-white/10 transition-colors group">
-                <span className="text-sm text-slate-300">Edit Profile</span>
-                <ExternalLink size={16} className="text-slate-500 group-hover:text-indigo-400 transition-colors" />
-              </Link>
+            {/* Deadlines Section */}
+            <div className="glass-card-static p-8">
+              <h3 className="text-[10px] font-bold uppercase tracking-[0.3em] text-slate-500 mb-8 flex items-center gap-3 border-b border-white/5 pb-4">
+                <Clock size={14} /> Timeline Horizon
+              </h3>
+              <div className="space-y-8">
+                {[
+                  { title: 'Google Internships', time: '48H REMAINING', color: 'bg-amber-500' },
+                  { title: 'Stripe Hackathon', time: 'APRIL 20TH', color: 'bg-emerald-500' },
+                  { title: 'Microsoft Explore', time: '5 DAYS LEFT', color: 'bg-indigo-500' },
+                ].map((item, i) => (
+                  <div key={i} className="flex gap-5 group cursor-default">
+                    <div className={`w-1 h-10 rounded-full ${item.color} opacity-20 group-hover:opacity-100 transition-opacity`} />
+                    <div>
+                      <div className="text-sm font-semibold text-white group-hover:text-emerald-400 transition-colors uppercase tracking-tight">{item.title}</div>
+                      <div className="text-[10px] text-slate-500 font-bold tracking-widest mt-1 opacity-70">{item.time}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Quick Portals */}
+            <div className="glass-card-static p-8 bg-surface-lowest">
+              <h3 className="text-[10px] font-bold uppercase tracking-[0.3em] text-gold-500/60 mb-8 flex items-center gap-3">
+                <Target size={14} /> Neural Portals
+              </h3>
+              <div className="space-y-4">
+                <Link href="/resume" className="flex items-center justify-between p-4 rounded-xl bg-white/[0.02] border border-white/[0.03] hover:bg-emerald-500/[0.03] hover:border-emerald-500/20 transition-all group">
+                  <span className="text-xs font-bold uppercase tracking-widest text-slate-400 group-hover:text-white transition-colors">Sync DNA Profile</span>
+                  <div className="p-2 rounded-lg bg-white/5 group-hover:bg-emerald-500/20 transition-all">
+                    <Plus size={16} className="text-slate-500 group-hover:text-emerald-400" />
+                  </div>
+                </Link>
+                <Link href="/profile" className="flex items-center justify-between p-4 rounded-xl bg-white/[0.02] border border-white/[0.03] hover:bg-gold-500/[0.02] hover:border-gold-500/20 transition-all group">
+                  <span className="text-xs font-bold uppercase tracking-widest text-slate-400 group-hover:text-white transition-colors">Modify Core ID</span>
+                  <div className="p-2 rounded-lg bg-white/5 group-hover:bg-gold-500/20 transition-all">
+                    <ExternalLink size={16} className="text-slate-500 group-hover:text-amber-500" />
+                  </div>
+                </Link>
+              </div>
             </div>
           </div>
         </div>
