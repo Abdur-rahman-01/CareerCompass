@@ -6,7 +6,7 @@ python-multipart
 python-dotenv
 aiosqlite
 firecrawl
-crewai
+crewai[tools]
 litellm
 pdfminer.six
 python-docx
