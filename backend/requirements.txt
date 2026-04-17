@@ -11,3 +11,4 @@ litellm
 pdfminer.six
 python-docx
 google-generativeai
+langchain-openai
